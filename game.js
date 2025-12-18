@@ -47,6 +47,49 @@ SnakeDevourMoles.prototype.setupEventListeners = function() {
     document.getElementById('pauseBtn').addEventListener('touchstart', function(e) { e.preventDefault(); self.togglePause(); });
     document.getElementById('restartBtn').addEventListener('touchstart', function(e) { e.preventDefault(); self.restartGame(); });
     
+    // 添加触摸滑动事件
+    var touchStartX = 0;
+    var touchStartY = 0;
+    
+    document.addEventListener('touchstart', function(e) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        e.preventDefault();
+    });
+    
+    document.addEventListener('touchend', function(e) {
+        if (!self.gameRunning || self.gamePaused) return;
+        
+        var touchEndX = e.changedTouches[0].clientX;
+        var touchEndY = e.changedTouches[0].clientY;
+        
+        var deltaX = touchEndX - touchStartX;
+        var deltaY = touchEndY - touchStartY;
+        
+        // 计算滑动方向
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            // 水平滑动
+            if (deltaX > 20) {
+                // 向右滑动
+                if (self.direction.x === 0) self.nextDirection = {x: 1, y: 0};
+            } else if (deltaX < -20) {
+                // 向左滑动
+                if (self.direction.x === 0) self.nextDirection = {x: -1, y: 0};
+            }
+        } else {
+            // 垂直滑动
+            if (deltaY > 20) {
+                // 向下滑动
+                if (self.direction.y === 0) self.nextDirection = {x: 0, y: 1};
+            } else if (deltaY < -20) {
+                // 向上滑动
+                if (self.direction.y === 0) self.nextDirection = {x: 0, y: -1};
+            }
+        }
+        
+        e.preventDefault();
+    });
+    
     window.game = this;
     window.changeDirection = function(x, y) { self.changeDirection(x, y); };
     window.pauseGame = function() { self.togglePause(); };
@@ -72,6 +115,12 @@ SnakeDevourMoles.prototype.togglePause = function() {
     if (this.gameRunning) {
         this.gamePaused = !this.gamePaused;
         document.getElementById('pauseBtn').textContent = this.gamePaused ? '继续' : '暂停';
+        
+        // 如果游戏从暂停状态切换到继续状态，重新启动gameLoop
+        if (!this.gamePaused) {
+            var self = this;
+            setTimeout(function() { self.gameLoop(); }, self.gameSpeed);
+        }
     }
 };
 
@@ -153,7 +202,7 @@ SnakeDevourMoles.prototype.getMaxMoles = function() {
     } else if (emptyTiles.length < 8) {
         return 2;
     } else {
-        return Math.min(Math.floor(emptyTiles.length / 4), 15);
+        return Math.min(Math.floor(emptyTiles.length / 8), 15);
     }
 };
 
@@ -355,7 +404,7 @@ SnakeDevourMoles.prototype.updateMoleCount = function() {
 };
 
 SnakeDevourMoles.prototype.draw = function() {
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 1)';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     
     this.drawGrid();
@@ -387,48 +436,24 @@ SnakeDevourMoles.prototype.drawSnake = function() {
         var y = segment.y * self.gridSize;
         
         if (index === 0) {
+            // 蛇头
             self.ctx.fillStyle = '#2E7D32';
             self.ctx.fillRect(x, y, self.gridSize, self.gridSize);
             
             self.ctx.fillStyle = '#4CAF50';
             self.ctx.fillRect(x + 1, y + 1, self.gridSize - 2, self.gridSize - 2);
             
+            // 简单的眼睛
             self.ctx.fillStyle = '#000000';
             self.ctx.fillRect(x + 4, y + 4, 3, 3);
             self.ctx.fillRect(x + 13, y + 4, 3, 3);
-            
-            self.ctx.fillStyle = '#FFFFFF';
-            self.ctx.fillRect(x + 5, y + 5, 1, 1);
-            self.ctx.fillRect(x + 14, y + 5, 1, 1);
-            
-            if (self.direction.x !== 0 || self.direction.y !== 0) {
-                self.ctx.fillStyle = '#FF6B6B';
-                if (self.direction.x === 1) {
-                    self.ctx.fillRect(x + self.gridSize, y + 8, 2, 4);
-                } else if (self.direction.x === -1) {
-                    self.ctx.fillRect(x - 2, y + 8, 2, 4);
-                } else if (self.direction.y === 1) {
-                    self.ctx.fillRect(x + 8, y + self.gridSize, 4, 2);
-                } else if (self.direction.y === -1) {
-                    self.ctx.fillRect(x + 8, y - 2, 4, 2);
-                }
-            }
         } else {
-            var gradient = self.ctx.createLinearGradient(x, y, x + self.gridSize, y + self.gridSize);
-            gradient.addColorStop(0, '#1976D2');
-            gradient.addColorStop(1, '#64B5F6');
-            self.ctx.fillStyle = gradient;
+            // 蛇身
+            self.ctx.fillStyle = '#1976D2';
             self.ctx.fillRect(x, y, self.gridSize, self.gridSize);
             
             self.ctx.fillStyle = '#1565C0';
             self.ctx.fillRect(x + 2, y + 2, self.gridSize - 4, self.gridSize - 4);
-            
-            self.ctx.fillStyle = '#90CAF9';
-            for (var i = 0; i < 3; i++) {
-                for (var j = 0; j < 3; j++) {
-                    self.ctx.fillRect(x + 5 + i * 4, y + 5 + j * 4, 2, 2);
-                }
-            }
         }
     });
 };
@@ -443,58 +468,16 @@ SnakeDevourMoles.prototype.drawMoles = function() {
         self.ctx.fillRect(x, y, self.gridSize, self.gridSize);
         
         self.ctx.fillStyle = '#A0522D';
-        self.ctx.fillRect(x + 1, y + 1, self.gridSize - 2, self.gridSize - 2);
+        self.ctx.fillRect(x + 2, y + 2, self.gridSize - 4, self.gridSize - 4);
         
-        self.ctx.fillStyle = '#8B4513';
-        self.ctx.fillRect(x + 2, y - 2, 4, 3);
-        self.ctx.fillRect(x + 14, y - 2, 4, 3);
-        
-        self.ctx.fillStyle = '#D2691E';
-        self.ctx.fillRect(x + 3, y - 1, 2, 2);
-        self.ctx.fillRect(x + 15, y - 1, 2, 2);
-        
+        // 简单的眼睛
         self.ctx.fillStyle = '#000000';
         self.ctx.fillRect(x + 5, y + 5, 3, 3);
         self.ctx.fillRect(x + 12, y + 5, 3, 3);
         
-        self.ctx.fillStyle = '#FFFFFF';
-        self.ctx.fillRect(x + 6, y + 6, 1, 1);
-        self.ctx.fillRect(x + 13, y + 6, 1, 1);
-        
+        // 简单的鼻子
         self.ctx.fillStyle = '#FF6B6B';
         self.ctx.fillRect(x + 9, y + 8, 2, 2);
-        
-        self.ctx.strokeStyle = '#000000';
-        self.ctx.lineWidth = 0.5;
-        
-        self.ctx.beginPath();
-        self.ctx.moveTo(x + 8, y + 10);
-        self.ctx.lineTo(x + 4, y + 8);
-        self.ctx.stroke();
-        
-        self.ctx.beginPath();
-        self.ctx.moveTo(x + 8, y + 10);
-        self.ctx.lineTo(x + 4, y + 12);
-        self.ctx.stroke();
-        
-        self.ctx.beginPath();
-        self.ctx.moveTo(x + 12, y + 10);
-        self.ctx.lineTo(x + 16, y + 8);
-        self.ctx.stroke();
-        
-        self.ctx.beginPath();
-        self.ctx.moveTo(x + 12, y + 10);
-        self.ctx.lineTo(x + 16, y + 12);
-        self.ctx.stroke();
-        
-        var timeSinceSpawn = Date.now() - mole.spawnTime;
-        var timeUntilDisappear = mole.lifetime - timeSinceSpawn;
-        
-        if (timeSinceSpawn < 100 || timeUntilDisappear < 100) {
-            var flashAlpha = Math.sin(timeSinceSpawn / 20) * 0.5 + 0.5;
-            self.ctx.fillStyle = 'rgba(255, 255, 255, ' + flashAlpha + ')';
-            self.ctx.fillRect(x, y, self.gridSize, self.gridSize);
-        }
     });
 };
 
